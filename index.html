@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Survey Plan Closure Assistant</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">Survey plan review tool</p>
+      <h1>Survey Plan Closure Assistant</h1>
+      <p class="subtitle">Select dimensions from a plan, confirm each leg, then calculate closure and area.</p>
+    </div>
+    <span class="privacy-note">Plan processing stays in your browser</span>
+  </header>
+
+  <main>
+    <section class="card upload-card" aria-labelledby="uploadTitle">
+      <div>
+        <h2 id="uploadTitle">1. Upload the plan</h2>
+        <p>Upload a multi-page PDF or a PNG/JPEG image. For PDFs without selectable text, the selected region is read using OCR.</p>
+      </div>
+      <label class="file-button">
+        <input id="planFile" type="file" accept="application/pdf,image/png,image/jpeg,image/webp">
+        Choose PDF or image
+      </label>
+      <p id="fileStatus" class="status" role="status">No plan loaded.</p>
+    </section>
+
+    <section class="workspace" aria-label="Plan capture workspace">
+      <div class="card plan-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>2. Select the page and dimension</h2>
+            <p>Choose a field on the right, then drag a box around its text on the plan.</p>
+          </div>
+          <div class="page-controls">
+            <button id="previousPageBtn" type="button" disabled>Previous</button>
+            <label>Page
+              <select id="pageSelect" disabled></select>
+            </label>
+            <button id="nextPageBtn" type="button" disabled>Next</button>
+            <button id="zoomOutBtn" type="button" disabled aria-label="Zoom out">−</button>
+            <span id="zoomLabel">100%</span>
+            <button id="zoomInBtn" type="button" disabled aria-label="Zoom in">+</button>
+          </div>
+        </div>
+
+        <div id="thumbnailStrip" class="thumbnail-strip" aria-label="Plan pages"></div>
+
+        <div id="planViewport" class="plan-viewport">
+          <div id="canvasStack" class="canvas-stack">
+            <canvas id="planCanvas"></canvas>
+            <canvas id="selectionCanvas" aria-label="Draw a selection around plan text"></canvas>
+          </div>
+          <div id="emptyPlanMessage" class="empty-plan">Upload a plan to begin.</div>
+        </div>
+      </div>
+
+      <aside class="card capture-panel" aria-labelledby="captureTitle">
+        <h2 id="captureTitle">3. Capture the current leg</h2>
+        <p id="selectedLegLabel" class="selected-leg">Leg 1 selected</p>
+
+        <fieldset id="captureTargets">
+          <legend>Select what you are capturing</legend>
+          <label><input type="radio" name="captureTarget" value="bearing" checked> Bearing</label>
+          <label><input type="radio" name="captureTarget" value="distance"> Distance / Arc</label>
+          <label><input type="radio" name="captureTarget" value="radius"> Radius</label>
+          <label><input type="radio" name="captureTarget" value="direction"> Curve direction</label>
+        </fieldset>
+
+        <div class="capture-instructions">
+          <strong id="captureInstruction">Draw a tight box around the bearing.</strong>
+          <span>Include only the required text where possible.</span>
+        </div>
+
+        <canvas id="cropPreview" width="300" height="100" aria-label="Selected plan region"></canvas>
+
+        <div class="rotation-row">
+          <label for="rotationInput">Text rotation</label>
+          <input id="rotationInput" type="number" min="-180" max="180" step="1" value="0">
+          <span>degrees</span>
+        </div>
+        <div class="rotation-presets">
+          <button type="button" data-rotation="0">0°</button>
+          <button type="button" data-rotation="-90">−90°</button>
+          <button type="button" data-rotation="90">+90°</button>
+          <button type="button" data-rotation="180">180°</button>
+        </div>
+
+        <button id="readSelectionBtn" class="primary full-width" type="button" disabled>Read Selected Text</button>
+        <p id="ocrStatus" class="status" role="status">Draw a selection on the plan.</p>
+
+        <label for="recognizedValue">Recognized value</label>
+        <input id="recognizedValue" type="text" autocomplete="off" placeholder="Review or correct the OCR result">
+        <p id="rawOcrText" class="raw-text"></p>
+        <button id="applyValueBtn" class="primary full-width" type="button" disabled>Apply to Selected Leg</button>
+
+        <div class="confirm-actions">
+          <button id="confirmLegBtn" class="success" type="button">Confirm Leg &amp; Add Next</button>
+          <button id="unconfirmLegBtn" type="button">Mark Unconfirmed</button>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card legs-card" aria-labelledby="legsTitle">
+      <div class="panel-heading">
+        <div>
+          <h2 id="legsTitle">4. Review the traverse legs</h2>
+          <p>Select a row before capturing text. Every recognized value remains editable.</p>
+        </div>
+        <button id="addLegBtn" type="button">Add Leg</button>
+      </div>
+
+      <div class="bearing-tools" aria-label="Bearing adjustment controls">
+        <strong>Bearing Adjustment</strong>
+        <span id="bearingAdjustmentLabel">Leg 1</span>
+        <button type="button" data-bearing-adjust="180">+180</button>
+        <button type="button" data-bearing-adjust="-180">−180</button>
+        <button type="button" data-bearing-adjust="90">+90</button>
+        <button type="button" data-bearing-adjust="-90">−90</button>
+        <input id="customAngle" type="text" placeholder="D.MMSS" aria-label="Custom angle">
+        <button id="addCustomAngleBtn" type="button">+ Angle</button>
+        <button id="subtractCustomAngleBtn" type="button">− Angle</button>
+      </div>
+
+      <div class="table-scroll">
+        <table id="legsTable">
+          <thead>
+            <tr>
+              <th>Leg</th>
+              <th>Type</th>
+              <th>Bearing (D.MMSS)</th>
+              <th>Dist/Arc</th>
+              <th>Radius</th>
+              <th>Dir</th>
+              <th>Page</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="table-actions">
+        <button id="calculateBtn" class="primary" type="button">Calculate Closure &amp; Area</button>
+        <button id="printBtn" type="button">Print Report</button>
+        <button id="clearBtn" type="button">Clear Traverse</button>
+      </div>
+    </section>
+
+    <section id="resultsSection" class="card results-card" aria-labelledby="resultsTitle">
+      <h2 id="resultsTitle">5. Results</h2>
+      <div class="results-grid">
+        <pre id="reportOutput">Enter and confirm the traverse legs, then calculate.</pre>
+        <div>
+          <canvas id="plotCanvas" width="720" height="540"></canvas>
+          <div class="legend"><span class="blue-line"></span>Traverse / curve <span class="orange-line"></span>Curve chord</div>
+        </div>
+      </div>
+      <p class="professional-note"><strong>Review required:</strong> OCR results and calculated values must be independently checked against the filed plan before professional use.</p>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@6/dist/tesseract.min.js"></script>
+  <script src="traverse-engine.js?v=1"></script>
+  <script src="app.js?v=1"></script>
+</body>
+</html>
